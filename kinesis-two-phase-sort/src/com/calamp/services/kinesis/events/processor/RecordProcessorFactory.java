@@ -13,7 +13,7 @@
  * permissions and limitations under the License.
  */
 
-package com.amazonaws.services.kinesis.samples.stocktrades.processor;/*
+package com.calamp.services.kinesis.events.processor;/*
 
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -51,7 +51,12 @@ public class RecordProcessorFactory implements IRecordProcessorFactory {
      */
     @Override
     public IRecordProcessor createProcessor() {
-        return new RecordProcessor( isUnordered );
+    	if (isUnordered){
+    		return new UnorderedRecordProcessor(  );
+    	}
+    	else{
+    		return new OrderedRecordProcessor(  );
+    	}
     }
 
 }

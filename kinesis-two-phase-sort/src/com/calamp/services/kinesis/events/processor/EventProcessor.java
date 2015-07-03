@@ -13,7 +13,7 @@
  * permissions and limitations under the License.
  */
 
-package com.amazonaws.services.kinesis.samples.stocktrades.processor;
+package com.calamp.services.kinesis.events.processor;
 
 import java.util.UUID;
 import java.util.logging.Level;
@@ -22,6 +22,7 @@ import java.util.logging.Logger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.regions.Region;
 import com.amazonaws.regions.RegionUtils;
@@ -31,10 +32,9 @@ import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessorF
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.InitialPositionInStream;
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.KinesisClientLibConfiguration;
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.Worker;
-import com.amazonaws.services.kinesis.samples.stocktrades.utils.ConfigurationUtils;
-import com.amazonaws.services.kinesis.samples.stocktrades.utils.CredentialUtils;
-
-import darkhipo.LazyLogger;
+import com.calamp.services.kinesis.events.utils.ConfigurationUtils;
+import com.calamp.services.kinesis.events.utils.CredentialUtils;
+import com.calamp.services.kinesis.events.utils.LazyLogger;
 
 /**
  * Uses the Kinesis Client Library (KCL) to continuously consume and process stock trade
@@ -52,9 +52,9 @@ public class EventProcessor {
             Logger.getLogger("com.amazonaws.services.kinesis.samples.stocktrades.processor");
     
     private static void checkUsage(String[] args) {
-        if (args.length != 3) {
+        if (args.length != 4) {
             System.err.println("Usage: " + EventProcessor.class.getSimpleName()
-                    + " <application name> <stream name> <region>");
+                    + " <application name> <stream name> <region> <isUnordered>");
             System.exit(1);
         }
     }
@@ -72,10 +72,15 @@ public class EventProcessor {
 
     public static void main(String[] args) throws Exception {
         checkUsage(args);
-        String applicationName = args[0];
-        String streamName = args[1];
-        Region region = RegionUtils.getRegion(args[2]);
-        Boolean unorderedIngest = Boolean.valueOf(args[3]);
+        //String applicationName = args[0];
+        //String streamName = args[1];
+        //Region region = RegionUtils.getRegion(args[2]);
+     	boolean isUnordered = Boolean.valueOf( args[3] );
+        String applicationName = isUnordered ? com.calamp.services.kinesis.events.utils.Parameters.sortAppName : com.calamp.services.kinesis.events.utils.Parameters.consumeAppName;
+      
+       	String streamName = isUnordered ? com.calamp.services.kinesis.events.utils.Parameters.unorderdStreamName : com.calamp.services.kinesis.events.utils.Parameters.orderedStreamName;
+       	Region region = RegionUtils.getRegion( com.calamp.services.kinesis.events.utils.Parameters.regionName );
+
         if (region == null) {
             System.err.println(args[2] + " is not a valid AWS region.");
             System.exit(1);
@@ -84,37 +89,34 @@ public class EventProcessor {
         setLogLevels();
         LazyLogger.log("kinesis-test-read.log", false, "Consumer Start");
         AWSCredentialsProvider credentialsProvider = CredentialUtils.getCredentialsProvider();
-     
-        AmazonKinesis kinesisClient = new AmazonKinesisClient(credentialsProvider,
-                ConfigurationUtils.getClientConfigWithUserAgent());
+        ClientConfiguration cc = ConfigurationUtils.getClientConfigWithUserAgent(true);
+        AmazonKinesis kinesisClient = new AmazonKinesisClient(credentialsProvider, cc);
         kinesisClient.setRegion(region);
         
-        darkhipo.Utils.kinesisClient = kinesisClient;
+        com.calamp.services.kinesis.events.utils.Utils.kinesisClient = kinesisClient;
         
         String workerId = String.valueOf(UUID.randomUUID());
         KinesisClientLibConfiguration kclConfig =
              new KinesisClientLibConfiguration(applicationName, streamName, credentialsProvider, workerId)
             .withRegionName(region.getName())
-            .withCommonClientConfig(ConfigurationUtils.getClientConfigWithUserAgent())
-            .withMaxRecords(100)
-            .withIdleTimeBetweenReadsInMillis(5000)
+            .withCommonClientConfig(cc)
+            .withMaxRecords(com.calamp.services.kinesis.events.utils.Parameters.maxRecPerPoll)
+            .withIdleTimeBetweenReadsInMillis(com.calamp.services.kinesis.events.utils.Parameters.pollDelayMillis)
             .withCallProcessRecordsEvenForEmptyRecordList(true)
             .withInitialPositionInStream(InitialPositionInStream.TRIM_HORIZON); 
 
-        IRecordProcessorFactory recordProcessorFactory = new RecordProcessorFactory( unorderedIngest );
+        IRecordProcessorFactory processorFactory = new RecordProcessorFactory( isUnordered );
 
         // Create the KCL worker with the stock trade record processor factory
-        Worker worker = new Worker(recordProcessorFactory, kclConfig);
+        Worker worker = new Worker(processorFactory, kclConfig);
 
         int exitCode = 0;
         try {
-            worker.run();
+        	worker.run();
         } catch (Throwable t) {
             LOG.error("Caught throwable while processing data.", t);
             exitCode = 1;
         }
         System.exit(exitCode);
-
     }
-
 }

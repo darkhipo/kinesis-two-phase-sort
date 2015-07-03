@@ -13,14 +13,14 @@
  * permissions and limitations under the License.
  */
 
-package com.amazonaws.services.kinesis.samples.stocktrades.writer;
+package com.calamp.services.kinesis.events.writer;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 
-import darkhipo.Event;
+import com.calamp.services.kinesis.events.utils.Event;
 
 /**
  * Generates random stock trades by picking randomly from a collection of stocks, assigning a

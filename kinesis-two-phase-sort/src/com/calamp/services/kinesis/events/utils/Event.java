@@ -13,9 +13,10 @@
  * permissions and limitations under the License.
  */
 
-package darkhipo;
+package com.calamp.services.kinesis.events.utils;
 
 import java.io.IOException;
+import java.util.Random;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,6 +47,7 @@ public class Event {
     private long quantity;
     private long id;
     private long myTime;
+    private Random rand;
 
     public Event() {
     }
@@ -56,7 +58,8 @@ public class Event {
         this.price = price;
         this.quantity = quantity;
         this.id = id;
-        this.myTime = System.currentTimeMillis();
+        this.rand = new Random();
+        this.myTime = System.currentTimeMillis() + this.rand.nextInt(com.calamp.services.kinesis.events.utils.Parameters.minimumAgeMillis);
     }
 
     public String getTickerSymbol() {

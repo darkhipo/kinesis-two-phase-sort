@@ -13,7 +13,7 @@
  * permissions and limitations under the License.
  */
 
-package com.amazonaws.services.kinesis.samples.stocktrades.utils;
+package com.calamp.services.kinesis.events.utils;
 
 import com.amazonaws.ClientConfiguration;
 
@@ -22,10 +22,12 @@ import com.amazonaws.ClientConfiguration;
  */
 public class ConfigurationUtils {
 
-    private static final String APPLICATION_NAME = "amazon-kinesis-learning";
+    private static final String APPLICATION_NAME_UNORD = "amazon-kinesis-unordered";
+    private static final String APPLICATION_NAME_ORD = "amazon-kinesis-ordered";
     private static final String VERSION = "1.0.0";
 
-    public static ClientConfiguration getClientConfigWithUserAgent() {
+    public static ClientConfiguration getClientConfigWithUserAgent(boolean isUnordered) {
+    	String APPLICATION_NAME = isUnordered ? APPLICATION_NAME_UNORD : APPLICATION_NAME_ORD;
         final ClientConfiguration config = new ClientConfiguration();
         final StringBuilder userAgent = new StringBuilder(ClientConfiguration.DEFAULT_USER_AGENT);
 

@@ -13,71 +13,31 @@
  * permissions and limitations under the License.
  */
 
-package com.amazonaws.services.kinesis.samples.stocktrades.processor;
+package com.calamp.services.kinesis.events.processor;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
-import java.util.PriorityQueue;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import com.amazonaws.auth.AWSCredentials;
-import com.amazonaws.regions.Region;
-import com.amazonaws.regions.RegionUtils;
-import com.amazonaws.services.kinesis.AmazonKinesis;
-import com.amazonaws.services.kinesis.AmazonKinesisClient;
 import com.amazonaws.services.kinesis.clientlibrary.exceptions.InvalidStateException;
 import com.amazonaws.services.kinesis.clientlibrary.exceptions.ShutdownException;
 import com.amazonaws.services.kinesis.clientlibrary.exceptions.ThrottlingException;
 import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessor;
 import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessorCheckpointer;
 import com.amazonaws.services.kinesis.clientlibrary.types.ShutdownReason;
-import com.amazonaws.services.kinesis.model.DescribeStreamResult;
-import com.amazonaws.services.kinesis.model.GetRecordsRequest;
-import com.amazonaws.services.kinesis.model.GetRecordsResult;
-import com.amazonaws.services.kinesis.model.GetShardIteratorRequest;
-import com.amazonaws.services.kinesis.model.GetShardIteratorResult;
 import com.amazonaws.services.kinesis.model.Record;
-import com.amazonaws.services.kinesis.model.ResourceNotFoundException;
-import com.amazonaws.services.kinesis.model.ShardIteratorType;
-import com.amazonaws.services.kinesis.samples.stocktrades.utils.ConfigurationUtils;
-import com.amazonaws.services.kinesis.samples.stocktrades.utils.CredentialUtils;
-import com.amazonaws.services.kinesis.samples.stocktrades.writer.EventGenerator;
-
-import darkhipo.Event;
-import darkhipo.LazyLogger;
+import com.calamp.services.kinesis.events.utils.Event;
+import com.calamp.services.kinesis.events.utils.LazyLogger;
+import com.calamp.services.kinesis.events.utils.Parameters;
 
 /**
  * Processes records retrieved from stock trades stream.
  *
  */
-public class RecordProcessor implements IRecordProcessor {
+public class OrderedRecordProcessor implements IRecordProcessor {
 
-    private static final Log LOG = LogFactory.getLog(RecordProcessor.class);
+    private static final Log LOG = LogFactory.getLog(OrderedRecordProcessor.class);
     private String kinesisShardId;
-    private Boolean isUnordered;
-
-    public RecordProcessor(Boolean isUnordered) {
-    	this.isUnordered = isUnordered;
-    	Region region = RegionUtils.getRegion("us-west-2");
-    	
-    	if (this.isUnordered){
-    		AWSCredentials credentials;
-			try {
-				credentials = CredentialUtils.getCredentialsProvider().getCredentials();
-		        AmazonKinesis kinesisClient = new AmazonKinesisClient(credentials, ConfigurationUtils.getClientConfigWithUserAgent());
-		        kinesisClient.setRegion(region);
-		        darkhipo.Utils.validateStream(kinesisClient, darkhipo.Parameters.outStreamName);
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-
-            //com.amazonaws.services.kinesis.samples.stocktrades.writer.EventWriter.sendStockTrade(trade, kinesisClient, outStreamName);
-    	}
-	}
 
 	/**
      * {@inheritDoc}
@@ -93,12 +53,28 @@ public class RecordProcessor implements IRecordProcessor {
      */
     @Override
     public void processRecords(List<Record> records, IRecordProcessorCheckpointer checkpointer) {
-    	System.out.println("Process Records #" + records.size());    	
-    	List<darkhipo.Event> eList = Collections.synchronizedList(new ArrayList<darkhipo.Event>());
-    	Collections.sort(eList, new darkhipo.EventComparator());
+		System.out.println("Process Ordered Records #" + records.size());   
+		for (Record record : records) {
+	        // Final process record
+			Event e = processRecord( record );
+	    	System.out.println("ORDERED: " + e);
+	    }
     	checkpoint(checkpointer);
     }
 
+    private Event processRecord(Record record) {
+    	Event e = Event.fromJsonAsBytes(record.getData().array());
+    	if (e == null) {
+    	    LOG.warn("Skipping record. Unable to parse record into StockTrade. Partition Key: " + record.getPartitionKey());
+    	    return null;
+    	}
+    	String myStr = "";
+    	myStr += " Seq-ID: " + record.getSequenceNumber();
+    	myStr += " Part-K: " + record.getPartitionKey();
+    	myStr += " Data: " + e;
+    	LazyLogger.log(Parameters.readLogName, true, myStr);
+    	return e;
+    }
     /**
      * {@inheritDoc}
      */
@@ -113,7 +89,6 @@ public class RecordProcessor implements IRecordProcessor {
 
     private void checkpoint(IRecordProcessorCheckpointer checkpointer) {
         LOG.info("Checkpointing shard " + kinesisShardId);
-        
         try {
             checkpointer.checkpoint();
         } catch (ShutdownException se) {

@@ -1,4 +1,4 @@
-package darkhipo;
+package com.calamp.services.kinesis.events.utils;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
