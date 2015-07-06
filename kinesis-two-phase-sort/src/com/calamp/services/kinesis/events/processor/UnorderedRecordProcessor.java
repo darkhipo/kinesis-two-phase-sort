@@ -35,6 +35,7 @@ import com.amazonaws.services.kinesis.clientlibrary.exceptions.ThrottlingExcepti
 import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessor;
 import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessorCheckpointer;
 import com.amazonaws.services.kinesis.clientlibrary.types.ShutdownReason;
+import com.amazonaws.services.kinesis.model.PutRecordRequest;
 import com.amazonaws.services.kinesis.model.PutRecordsRequest;
 import com.amazonaws.services.kinesis.model.PutRecordsRequestEntry;
 import com.amazonaws.services.kinesis.model.PutRecordsResult;
@@ -42,6 +43,7 @@ import com.amazonaws.services.kinesis.model.Record;
 import com.calamp.services.kinesis.events.utils.ConfigurationUtils;
 import com.calamp.services.kinesis.events.utils.CredentialUtils;
 import com.calamp.services.kinesis.events.utils.Event;
+import com.calamp.services.kinesis.events.utils.EventAgeTest;
 import com.calamp.services.kinesis.events.utils.Parameters;
 
 /**
@@ -89,15 +91,14 @@ public class UnorderedRecordProcessor implements IRecordProcessor {
 		System.out.println("Process Unordered Records #" + records.size());   
 		List<Event> eventsOldEnough = Collections.synchronizedList( new ArrayList<Event>() );
 		List<Event> eventsTooYoung = Collections.synchronizedList( new ArrayList<Event>() );
-		List<PutRecordsRequestEntry> prres = Collections.synchronizedList( new ArrayList<PutRecordsRequestEntry>() );
 		for (Record r : records){    		
 	        // The bytes could be null if there is an issue with the JSON serialization by the Jackson JSON library.
 	        byte[] bytes = r.getData().array();
 			if (bytes == null ) {
 	    	    LOG.warn("Skipping record. Unable to parse record into StockTrade. Partition Key: " + r.getPartitionKey());
 	        }
-	        com.calamp.services.kinesis.events.utils.Event e = com.calamp.services.kinesis.events.utils.Event.fromJsonAsBytes( r.getData().array() );
-	        if( com.calamp.services.kinesis.events.utils.EventAgeTest.oldEnough(e) ){
+	        Event e = Event.fromJsonAsBytes( r.getData().array() );
+	        if( EventAgeTest.oldEnough(e) ){
 	        	eventsOldEnough.add(e);
 	        }
 	        else{
@@ -105,27 +106,22 @@ public class UnorderedRecordProcessor implements IRecordProcessor {
 	        }
 		}
 		Collections.sort( eventsOldEnough, new com.calamp.services.kinesis.events.utils.EventComparator() );
-		for(Event e : eventsOldEnough){
-			System.out.println("OLD ENOUGH: " + e);
-		}
-		for(Event e : eventsTooYoung){
-			System.out.println("TOO YOUNG: " + e);
-		}
-		putByParts(records, eventsOldEnough, prres, Parameters.orderedStreamName, kinesisClientToOrdered);
-		putByParts(records, eventsTooYoung, prres, Parameters.unorderdStreamName, kinesisClientToUnordered);
-		checkpoint(checkpointer);        	
+		Collections.sort( eventsTooYoung, new com.calamp.services.kinesis.events.utils.EventComparator() );
+		putByParts( eventsOldEnough, Parameters.orderedStreamName, kinesisClientToOrdered);
+		putByParts( eventsTooYoung, Parameters.unorderdStreamName, kinesisClientToUnordered);
+		checkpoint(checkpointer);  
     }
 
-	private void putByParts(List<Record> records, List<Event> events,
-			List<PutRecordsRequestEntry> prres, String streamName, AmazonKinesis kc) {
+	private void putByParts(List<Event> events, String streamName, AmazonKinesis kc) {
+		List<PutRecordsRequestEntry> prres = Collections.synchronizedList( new ArrayList<PutRecordsRequestEntry>() );
 		for (Event e : events){
 			PutRecordsRequestEntry prre = new PutRecordsRequestEntry().withData(ByteBuffer.wrap(e.toJsonAsBytes()));
 			prre.setPartitionKey("OnePartition");//trade.getTickerSymbol()
 			prres.add(prre);
 		}
 		if (prres.size() > 0){
-			int requestNumber = ( records.size() % Parameters.maxRecordsPerPut );
-			requestNumber += ( records.size() % Parameters.maxRecordsPerPut == 0 ) ? 0 : 1;
+			int requestNumber = ( events.size() / Parameters.maxRecordsPerPut );
+			requestNumber += (events.size() % Parameters.maxRecordsPerPut) == 0 ? 0 : 1;
 			for (int i=0; i<requestNumber; i++){
 				PutRecordsRequest putRecords = new PutRecordsRequest( ).withRecords(prres);
 				putRecords.setStreamName(streamName);
@@ -133,7 +129,7 @@ public class UnorderedRecordProcessor implements IRecordProcessor {
 			}
 		}
 	}
-
+	
     /**
      * {@inheritDoc}
      */
@@ -148,7 +144,6 @@ public class UnorderedRecordProcessor implements IRecordProcessor {
 
     private void checkpoint(IRecordProcessorCheckpointer checkpointer) {
         LOG.info("Checkpointing shard " + kinesisShardId);
-        
         try {
             checkpointer.checkpoint();
         } catch (ShutdownException se) {
@@ -161,6 +156,5 @@ public class UnorderedRecordProcessor implements IRecordProcessor {
             // This indicates an issue with the DynamoDB table (check for table, provisioned IOPS).
             LOG.error("Cannot save checkpoint to the DynamoDB table used by the Amazon Kinesis Client Library.", e);
         }
-        
     }
 }
