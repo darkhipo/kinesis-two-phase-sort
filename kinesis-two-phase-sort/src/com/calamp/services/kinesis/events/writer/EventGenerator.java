@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.calamp.services.kinesis.events.utils.Event;
+import com.calamp.services.kinesis.events.utils.CalAmpEvent;
 
 /**
  * Generates random stock trades by picking randomly from a collection of stocks, assigning a
@@ -75,7 +75,7 @@ public class EventGenerator {
      * Return a random stock trade with a unique id every time.
      *
      */
-    public Event getRandomTrade() {
+    public CalAmpEvent getRandomTrade() {
         // pick a random stock
         StockPrice stockPrice = STOCK_PRICES.get(random.nextInt(STOCK_PRICES.size()));
         // pick a random deviation between -MAX_DEVIATION and +MAX_DEVIATION
@@ -86,16 +86,16 @@ public class EventGenerator {
         price = Math.round(price * 100.0) / 100.0;
 
         // set the trade type to buy or sell depending on the probability of sell
-        Event.TradeType tradeType = Event.TradeType.BUY;
+        CalAmpEvent.TradeType tradeType = CalAmpEvent.TradeType.BUY;
         if (random.nextDouble() < PROBABILITY_SELL) {
-            tradeType = Event.TradeType.SELL;
+            tradeType = CalAmpEvent.TradeType.SELL;
         }
 
         // randomly pick a quantity of shares
         long quantity = random.nextInt(MAX_QUANTITY) + 1; // add 1 because nextInt() will return between 0 (inclusive)
                                                           // and MAX_QUANTITY (exclusive). we want at least 1 share.
 
-        return new Event(stockPrice.tickerSymbol, tradeType, price, quantity, id.getAndIncrement());
+        return new CalAmpEvent(stockPrice.tickerSymbol, tradeType, price, quantity, id.getAndIncrement());
     }
 
     private static class StockPrice {

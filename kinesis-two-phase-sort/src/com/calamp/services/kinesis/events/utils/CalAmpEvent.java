@@ -18,6 +18,8 @@ package com.calamp.services.kinesis.events.utils;
 import java.io.IOException;
 import java.util.Random;
 
+import javax.swing.text.html.HTMLDocument.HTMLReader.IsindexAction;
+
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -26,7 +28,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * number of shares, the type of the trade (buy or sell), and an id uniquely identifying
  * the trade.
  */
-public class Event {
+public class CalAmpEvent {
 
     private final static ObjectMapper JSON = new ObjectMapper();
     static {
@@ -49,17 +51,17 @@ public class Event {
     private long myTime;
     private Random rand;
 
-    public Event() {
-    }
-
-    public Event(String tickerSymbol, TradeType tradeType, double price, long quantity, long id) {
+    /*This default constructor must exist for JSON serialization*/
+    public CalAmpEvent(){}
+    
+    public CalAmpEvent(String tickerSymbol, TradeType tradeType, double price, long quantity, long id) {
         this.tickerSymbol = tickerSymbol;
         this.tradeType = tradeType;
         this.price = price;
         this.quantity = quantity;
         this.id = id;
         this.rand = new Random();
-        this.myTime = System.currentTimeMillis() + this.rand.nextInt(com.calamp.services.kinesis.events.utils.Parameters.minimumAgeMillis);
+        this.myTime = System.currentTimeMillis() + this.rand.nextInt(CalAmpParameters.minimumAgeMillis);
     }
 
     public String getTickerSymbol() {
@@ -90,22 +92,55 @@ public class Event {
         try {
             return JSON.writeValueAsBytes(this);
         } catch (IOException e) {
-            return null;
+        	e.printStackTrace();
+        	return null;
         }
     }
 
-    public static Event fromJsonAsBytes(byte[] bytes) {
+    public static CalAmpEvent fromJsonAsBytes(byte[] bytes) {
         try {
-            return JSON.readValue(bytes, Event.class);
+            return JSON.readValue(bytes, CalAmpEvent.class);
         } catch (IOException e) {
+        	e.printStackTrace();
             return null;
         }
     }
 
+    private boolean canEqual(Object other){
+    	return (other instanceof CalAmpEvent);
+    }
+    
     @Override
     public String toString() {
-        return String.format("%d ID %d: %s %d shares of %s for $%.02f",
+        return String.format("Time: %d ID %d: %s %d shares of %s for $%.02f",
                 myTime, id, tradeType, quantity, tickerSymbol, price);
     }
-
+    
+    @Override
+    public boolean equals(Object other){
+    	if ( this.canEqual(other) ){
+    		CalAmpEvent e2 = (CalAmpEvent) other;
+    		boolean mayEqual = true;
+    		mayEqual &= ( this.id == e2.getId() );
+    		mayEqual &= ( this.myTime == e2.getMyTime() );
+    		mayEqual &= ( this.price == e2.getPrice() ); 
+    		mayEqual &= ( this.quantity == e2.getQuantity() );
+    		mayEqual &= ( this.tickerSymbol.equals( e2.getTickerSymbol() ) );
+    		mayEqual &= ( this.tradeType.equals( e2.getTradeType() ) );
+    		return mayEqual;
+    	}
+    	return false;
+    }
+    
+    @Override 
+    public int hashCode() {
+        int result = 0; 
+    	result += 41 * this.id;
+        result += 41 * (int)(this.myTime ^ (this.myTime >>> 32));
+        result += 41 * Double.doubleToLongBits( this.price );
+        result += 41 * (int)(this.quantity ^ (this.quantity >>> 32)); 
+        result += 41 * this.tickerSymbol.hashCode();
+        result += 41 * this.tradeType.hashCode();
+        return result;
+    }
 }

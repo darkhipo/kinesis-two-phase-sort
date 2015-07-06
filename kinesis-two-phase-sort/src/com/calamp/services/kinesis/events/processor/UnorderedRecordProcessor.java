@@ -35,16 +35,18 @@ import com.amazonaws.services.kinesis.clientlibrary.exceptions.ThrottlingExcepti
 import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessor;
 import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessorCheckpointer;
 import com.amazonaws.services.kinesis.clientlibrary.types.ShutdownReason;
-import com.amazonaws.services.kinesis.model.PutRecordRequest;
 import com.amazonaws.services.kinesis.model.PutRecordsRequest;
 import com.amazonaws.services.kinesis.model.PutRecordsRequestEntry;
 import com.amazonaws.services.kinesis.model.PutRecordsResult;
+import com.amazonaws.services.kinesis.model.PutRecordsResultEntry;
 import com.amazonaws.services.kinesis.model.Record;
+import com.calamp.services.kinesis.events.utils.CalAmpEventPriorityComparator;
 import com.calamp.services.kinesis.events.utils.ConfigurationUtils;
 import com.calamp.services.kinesis.events.utils.CredentialUtils;
-import com.calamp.services.kinesis.events.utils.Event;
-import com.calamp.services.kinesis.events.utils.EventAgeTest;
-import com.calamp.services.kinesis.events.utils.Parameters;
+import com.calamp.services.kinesis.events.utils.CalAmpEvent;
+import com.calamp.services.kinesis.events.utils.CalAmpEventFilter;
+import com.calamp.services.kinesis.events.utils.CalAmpParameters;
+import com.calamp.services.kinesis.events.utils.Utils;
 
 /**
  * Processes records retrieved from stock trades stream.
@@ -59,7 +61,7 @@ public class UnorderedRecordProcessor implements IRecordProcessor {
 
     public UnorderedRecordProcessor() {
 		try {
-			Region region = RegionUtils.getRegion(com.calamp.services.kinesis.events.utils.Parameters.regionName);
+			Region region = RegionUtils.getRegion(CalAmpParameters.regionName);
 			AWSCredentials credentials = CredentialUtils.getCredentialsProvider().getCredentials();
 			ClientConfiguration ccuord = ConfigurationUtils.getClientConfigWithUserAgent(true);
 			ClientConfiguration ccord = ConfigurationUtils.getClientConfigWithUserAgent(false);
@@ -67,8 +69,9 @@ public class UnorderedRecordProcessor implements IRecordProcessor {
 			kinesisClientToOrdered = new AmazonKinesisClient(credentials, ccord);
 			kinesisClientToUnordered.setRegion(region);
 			kinesisClientToOrdered.setRegion(region);
-			com.calamp.services.kinesis.events.utils.Utils.validateStream(kinesisClientToUnordered, com.calamp.services.kinesis.events.utils.Parameters.unorderdStreamName);
-			com.calamp.services.kinesis.events.utils.Utils.validateStream(kinesisClientToOrdered, com.calamp.services.kinesis.events.utils.Parameters.orderedStreamName);
+			Utils.validateStream(kinesisClientToUnordered, CalAmpParameters.unorderdStreamName);
+			Utils.validateStream(kinesisClientToOrdered, CalAmpParameters.orderedStreamName);
+	        Utils.initLazyLog(CalAmpParameters.bufferLogName, "Sort Buffer Start");
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -88,44 +91,82 @@ public class UnorderedRecordProcessor implements IRecordProcessor {
      */
     @Override
     public void processRecords(List<Record> records, IRecordProcessorCheckpointer checkpointer) {
-		System.out.println("Process Unordered Records #" + records.size());   
-		List<Event> eventsOldEnough = Collections.synchronizedList( new ArrayList<Event>() );
-		List<Event> eventsTooYoung = Collections.synchronizedList( new ArrayList<Event>() );
-		for (Record r : records){    		
+		System.out.println("Process Unordered Records #" + records.size());
+		List<CalAmpEvent> eventsOldEnough = Collections.synchronizedList( new ArrayList<CalAmpEvent>() );
+		List<CalAmpEvent> eventsTooYoung = Collections.synchronizedList( new ArrayList<CalAmpEvent>() );
+		for (Record r : records){    
+			Utils.lazyLog(r, CalAmpParameters.unorderdStreamName, CalAmpParameters.bufferLogName);
 	        // The bytes could be null if there is an issue with the JSON serialization by the Jackson JSON library.
 	        byte[] bytes = r.getData().array();
-			if (bytes == null ) {
-	    	    LOG.warn("Skipping record. Unable to parse record into StockTrade. Partition Key: " + r.getPartitionKey());
-	        }
-	        Event e = Event.fromJsonAsBytes( r.getData().array() );
-	        if( EventAgeTest.oldEnough(e) ){
-	        	eventsOldEnough.add(e);
-	        }
-	        else{
-	        	eventsTooYoung.add(e);
-	        }
+			if (bytes != null ) {
+		        CalAmpEvent e = CalAmpEvent.fromJsonAsBytes( r.getData().array() );
+				if (e != null ) {
+			        if ( !(eventsOldEnough.contains(e)) ){
+			        	if ( CalAmpEventFilter.oldEnough(e) ){
+			        		eventsOldEnough.add(e);
+			        	}
+			        	else if ( !(eventsTooYoung.contains(e)) ){
+			        		eventsTooYoung.add(e);
+			        	}
+			        }
+				}
+		        else{
+		        	LOG.warn("Skipping record. Unable to parse record into CalAmpEvent 2. Partition Key: " + r.getPartitionKey() + " Event: " + e);
+		        }
+			}
+			else{
+				LOG.warn("Skipping record. Unable to parse record into CalAmpEvent 1. Partition Key: " + r.getPartitionKey());
+			}
 		}
-		Collections.sort( eventsOldEnough, new com.calamp.services.kinesis.events.utils.EventComparator() );
-		Collections.sort( eventsTooYoung, new com.calamp.services.kinesis.events.utils.EventComparator() );
-		putByParts( eventsOldEnough, Parameters.orderedStreamName, kinesisClientToOrdered);
-		putByParts( eventsTooYoung, Parameters.unorderdStreamName, kinesisClientToUnordered);
+		
+		Collections.sort( eventsOldEnough, new CalAmpEventPriorityComparator() );
+		Collections.sort( eventsTooYoung, new CalAmpEventPriorityComparator() );
+		
+		for ( CalAmpEvent cae : eventsTooYoung ){
+			LOG.info("Event too young : " + cae);
+			
+		}
+		for ( CalAmpEvent cae : eventsOldEnough ){
+			LOG.info("Event old enough: " + cae);
+		}
+		
+		putByParts( eventsTooYoung, CalAmpParameters.unorderdStreamName, kinesisClientToUnordered);
+		putByParts( eventsOldEnough, CalAmpParameters.orderedStreamName, kinesisClientToOrdered);
 		checkpoint(checkpointer);  
     }
 
-	private void putByParts(List<Event> events, String streamName, AmazonKinesis kc) {
+	private void putByParts(List<CalAmpEvent> events, String streamName, AmazonKinesis kc) {
 		List<PutRecordsRequestEntry> prres = Collections.synchronizedList( new ArrayList<PutRecordsRequestEntry>() );
-		for (Event e : events){
+		for (CalAmpEvent e : events){
 			PutRecordsRequestEntry prre = new PutRecordsRequestEntry().withData(ByteBuffer.wrap(e.toJsonAsBytes()));
-			prre.setPartitionKey("OnePartition");//trade.getTickerSymbol()
+			prre.setPartitionKey( e.getTickerSymbol() );
 			prres.add(prre);
+			Utils.lazyLog(prre, streamName, CalAmpParameters.bufferLogName);
 		}
 		if (prres.size() > 0){
-			int requestNumber = ( events.size() / Parameters.maxRecordsPerPut );
-			requestNumber += (events.size() % Parameters.maxRecordsPerPut) == 0 ? 0 : 1;
-			for (int i=0; i<requestNumber; i++){
+			int requestNumber = ( events.size() / CalAmpParameters.maxRecordsPerPut );
+			requestNumber += (events.size() % CalAmpParameters.maxRecordsPerPut) == 0 ? 0 : 1;
+			for (int j=0; j<requestNumber; j++){
 				PutRecordsRequest putRecords = new PutRecordsRequest( ).withRecords(prres);
 				putRecords.setStreamName(streamName);
 				PutRecordsResult prr = kc.putRecords(putRecords);
+				
+				/* Retry failed "record puts" until success.
+				 */
+				while (prr.getFailedRecordCount() > 0) {
+				    final List<PutRecordsRequestEntry> failedRecordsList = new ArrayList<>();
+				    final List<PutRecordsResultEntry> putRecordsResultEntryList = prr.getRecords();
+				    for (int i = 0; i < putRecordsResultEntryList.size(); i++) {
+				        final PutRecordsRequestEntry putRecordRequestEntry = prres.get(i);
+				        final PutRecordsResultEntry putRecordsResultEntry = putRecordsResultEntryList.get(i);
+				        if (putRecordsResultEntry.getErrorCode() != null) {
+				            failedRecordsList.add(putRecordRequestEntry);
+				        }
+				    }
+				    prres = failedRecordsList;
+				    putRecords.setRecords(prres);
+				    prr = kc.putRecords(putRecords);
+				}
 			}
 		}
 	}

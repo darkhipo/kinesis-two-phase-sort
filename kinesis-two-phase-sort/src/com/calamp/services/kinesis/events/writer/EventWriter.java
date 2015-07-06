@@ -25,6 +25,7 @@ import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.regions.Region;
 import com.amazonaws.regions.RegionUtils;
+import com.amazonaws.services.dynamodbv2.datamodeling.AttributeTransformer.Parameters;
 import com.amazonaws.services.kinesis.AmazonKinesis;
 import com.amazonaws.services.kinesis.AmazonKinesisClient;
 import com.amazonaws.services.kinesis.model.DescribeStreamResult;
@@ -33,8 +34,10 @@ import com.amazonaws.services.kinesis.model.PutRecordResult;
 import com.amazonaws.services.kinesis.model.ResourceNotFoundException;
 import com.calamp.services.kinesis.events.utils.ConfigurationUtils;
 import com.calamp.services.kinesis.events.utils.CredentialUtils;
-import com.calamp.services.kinesis.events.utils.Event;
+import com.calamp.services.kinesis.events.utils.CalAmpEvent;
 import com.calamp.services.kinesis.events.utils.LazyLogger;
+import com.calamp.services.kinesis.events.utils.CalAmpParameters;
+import com.calamp.services.kinesis.events.utils.Utils;
 
 /**
  * Continuously sends simulated stock trades to Kinesis
@@ -60,7 +63,7 @@ public class EventWriter {
      * @param kinesisClient Amazon Kinesis client
      * @param streamName Name of stream
      */
-    public static void sendEvent(Event trade, AmazonKinesis kinesisClient, String streamName ) {
+    public static void sendEvent(CalAmpEvent trade, AmazonKinesis kinesisClient, String streamName ) {
         byte[] bytes = trade.toJsonAsBytes();
         // The bytes could be null if there is an issue with the JSON serialization by the Jackson JSON library.
         if (bytes == null) {
@@ -70,8 +73,8 @@ public class EventWriter {
         
         LOG.info("Putting trade: " + trade.toString());
         PutRecordRequest putRecord = new PutRecordRequest();
-        putRecord.setStreamName(com.calamp.services.kinesis.events.utils.Parameters.unorderdStreamName);
-        putRecord.setPartitionKey("OnePartition");//trade.getTickerSymbol()
+        putRecord.setStreamName(CalAmpParameters.unorderdStreamName);
+        putRecord.setPartitionKey(trade.getTickerSymbol());
         putRecord.setData(ByteBuffer.wrap(bytes));
 
         //This is needed to guaranteed FIFO ordering per partitionKey
@@ -79,13 +82,9 @@ public class EventWriter {
         	 putRecord.setSequenceNumberForOrdering( prevSeqNum );
         }
         try {
-        	String myStr = "";
-        	myStr += " Seq-ID: " + putRecord.getSequenceNumberForOrdering();
-        	myStr += " Part-K: " + putRecord.getPartitionKey();
-        	myStr += " Data: " + trade;
-        	PutRecordResult x = kinesisClient.putRecord(putRecord);
-        	prevSeqNum = x.getSequenceNumber();
-        	LazyLogger.log("kinesis-test-write.log", true, myStr);
+        	PutRecordResult res = kinesisClient.putRecord(putRecord);
+        	prevSeqNum = res.getSequenceNumber();
+        	Utils.lazyLog(putRecord, CalAmpParameters.writeLogName);
         } catch (AmazonClientException ex) {
             LOG.warn("Error sending record to Amazon Kinesis.", ex);
         }
@@ -93,14 +92,13 @@ public class EventWriter {
     
     public static void main(String[] args) throws Exception {
         checkUsage(args);
-        String streamName = com.calamp.services.kinesis.events.utils.Parameters.unorderdStreamName; //args[0];
-        String regionName = com.calamp.services.kinesis.events.utils.Parameters.regionName;
+        String streamName = CalAmpParameters.unorderdStreamName; //args[0];
+        String regionName = CalAmpParameters.regionName;
         Region region = RegionUtils.getRegion(regionName);
         if (region == null) {
             System.err.println(regionName + " is not a valid AWS region.");
             System.exit(1);
         }
-
         AWSCredentials credentials = CredentialUtils.getCredentialsProvider().getCredentials();
 
         ClientConfiguration ccuo = ConfigurationUtils.getClientConfigWithUserAgent(true);
@@ -108,16 +106,16 @@ public class EventWriter {
         kinesisClient.setRegion(region);
 
         // Validate that the stream exists and is active
-        com.calamp.services.kinesis.events.utils.Utils.validateStream(kinesisClient, streamName);
+        Utils.validateStream(kinesisClient, streamName);
 
-        LazyLogger.log(com.calamp.services.kinesis.events.utils.Parameters.writeLogName, false, "Producer Start");
+        Utils.initLazyLog(CalAmpParameters.writeLogName, "Producer Start");
+        
         // Repeatedly send stock trades with a some milliseconds wait in between
         EventGenerator stockTradeGenerator = new EventGenerator();
         while( true ) {
-            Event trade = stockTradeGenerator.getRandomTrade();
+            CalAmpEvent trade = stockTradeGenerator.getRandomTrade();
             sendEvent(trade, kinesisClient, streamName);
-            Thread.sleep(com.calamp.services.kinesis.events.utils.Parameters.writerSleepMillis);
+            Thread.sleep(com.calamp.services.kinesis.events.utils.CalAmpParameters.writerSleepMillis);
         }
     }
-
 }

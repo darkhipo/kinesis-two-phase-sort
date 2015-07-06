@@ -35,6 +35,8 @@ import com.amazonaws.services.kinesis.clientlibrary.lib.worker.Worker;
 import com.calamp.services.kinesis.events.utils.ConfigurationUtils;
 import com.calamp.services.kinesis.events.utils.CredentialUtils;
 import com.calamp.services.kinesis.events.utils.LazyLogger;
+import com.calamp.services.kinesis.events.utils.CalAmpParameters;
+import com.calamp.services.kinesis.events.utils.Utils;
 
 /**
  * Uses the Kinesis Client Library (KCL) to continuously consume and process stock trade
@@ -43,9 +45,9 @@ import com.calamp.services.kinesis.events.utils.LazyLogger;
  * load balances shards across all the instances of this processor.
  *
  */
-public class EventProcessor {
+public class CalAmpEventProcessor {
 
-    private static final Log LOG = LogFactory.getLog(EventProcessor.class);
+    private static final Log LOG = LogFactory.getLog(CalAmpEventProcessor.class);
 
     private static final Logger ROOT_LOGGER = Logger.getLogger("");
     private static final Logger PROCESSOR_LOGGER =
@@ -53,7 +55,7 @@ public class EventProcessor {
     
     private static void checkUsage(String[] args) {
         if (args.length != 4) {
-            System.err.println("Usage: " + EventProcessor.class.getSimpleName()
+            System.err.println("Usage: " + CalAmpEventProcessor.class.getSimpleName()
                     + " <application name> <stream name> <region> <isUnordered>");
             System.exit(1);
         }
@@ -66,7 +68,7 @@ public class EventProcessor {
      *
      */
     private static void setLogLevels() {
-        ROOT_LOGGER.setLevel(Level.ALL);
+        ROOT_LOGGER.setLevel(Level.INFO);
         PROCESSOR_LOGGER.setLevel(Level.INFO);
     }
 
@@ -76,10 +78,9 @@ public class EventProcessor {
         //String streamName = args[1];
         //Region region = RegionUtils.getRegion(args[2]);
      	boolean isUnordered = Boolean.valueOf( args[3] );
-        String applicationName = isUnordered ? com.calamp.services.kinesis.events.utils.Parameters.sortAppName : com.calamp.services.kinesis.events.utils.Parameters.consumeAppName;
-      
-       	String streamName = isUnordered ? com.calamp.services.kinesis.events.utils.Parameters.unorderdStreamName : com.calamp.services.kinesis.events.utils.Parameters.orderedStreamName;
-       	Region region = RegionUtils.getRegion( com.calamp.services.kinesis.events.utils.Parameters.regionName );
+        String applicationName = isUnordered ? CalAmpParameters.sortAppName : CalAmpParameters.consumeAppName;
+       	String streamName = isUnordered ? CalAmpParameters.unorderdStreamName : CalAmpParameters.orderedStreamName;
+       	Region region = RegionUtils.getRegion( CalAmpParameters.regionName );
 
         if (region == null) {
             System.err.println(args[2] + " is not a valid AWS region.");
@@ -87,7 +88,6 @@ public class EventProcessor {
         }
 
         setLogLevels();
-        LazyLogger.log("kinesis-test-read.log", false, "Consumer Start");
         AWSCredentialsProvider credentialsProvider = CredentialUtils.getCredentialsProvider();
         ClientConfiguration cc = ConfigurationUtils.getClientConfigWithUserAgent(true);
         AmazonKinesis kinesisClient = new AmazonKinesisClient(credentialsProvider, cc);
@@ -100,8 +100,8 @@ public class EventProcessor {
              new KinesisClientLibConfiguration(applicationName, streamName, credentialsProvider, workerId)
             .withRegionName(region.getName())
             .withCommonClientConfig(cc)
-            .withMaxRecords(com.calamp.services.kinesis.events.utils.Parameters.maxRecPerPoll)
-            .withIdleTimeBetweenReadsInMillis(com.calamp.services.kinesis.events.utils.Parameters.pollDelayMillis)
+            .withMaxRecords(com.calamp.services.kinesis.events.utils.CalAmpParameters.maxRecPerPoll)
+            .withIdleTimeBetweenReadsInMillis(com.calamp.services.kinesis.events.utils.CalAmpParameters.pollDelayMillis)
             .withCallProcessRecordsEvenForEmptyRecordList(true)
             .withInitialPositionInStream(InitialPositionInStream.TRIM_HORIZON); 
 

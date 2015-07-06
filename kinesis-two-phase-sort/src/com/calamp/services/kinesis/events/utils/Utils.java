@@ -11,10 +11,13 @@ import java.nio.ByteBuffer;
 import org.apache.commons.logging.Log;
 
 import com.amazonaws.AmazonClientException;
+import com.amazonaws.kinesis.producer.protobuf.Messages.PutRecord;
 import com.amazonaws.services.kinesis.AmazonKinesis;
 import com.amazonaws.services.kinesis.model.DescribeStreamResult;
 import com.amazonaws.services.kinesis.model.PutRecordRequest;
 import com.amazonaws.services.kinesis.model.PutRecordResult;
+import com.amazonaws.services.kinesis.model.PutRecordsRequestEntry;
+import com.amazonaws.services.kinesis.model.Record;
 import com.amazonaws.services.kinesis.model.ResourceNotFoundException;
 
 public class Utils {
@@ -72,4 +75,28 @@ public class Utils {
             System.exit(1);
         }
     }
+    
+    public static void lazyLog(PutRecordRequest putRecord, String logPath) {
+    	String myStr = "PUT TO [" + putRecord.getStreamName() + "] ";
+    	myStr += " Seq-ID: " + putRecord.getSequenceNumberForOrdering();
+    	myStr += " Part-K: " + putRecord.getPartitionKey();
+    	myStr += " Data: " + CalAmpEvent.fromJsonAsBytes( putRecord.getData().array() );
+    	LazyLogger.log(logPath, true, myStr);
+    }
+    public static void lazyLog(Record record, String stream, String logPath) {
+    	String myStr = "GET AT [" + stream + "] ";
+    	myStr += " Seq-ID: " + record.getSequenceNumber();
+    	myStr += " Part-K: " + record.getPartitionKey();
+    	myStr += " Data: " + CalAmpEvent.fromJsonAsBytes( record.getData().array() );
+    	LazyLogger.log(logPath, true, myStr);
+    }
+    public static void initLazyLog(String logPath, String initMessage) {
+    	LazyLogger.log(logPath, false, initMessage);
+    }
+	public static void lazyLog(PutRecordsRequestEntry prre, String streamName, String logPath) {
+    	String myStr = "PUT TO [" + streamName + "] ";
+    	myStr += " Part-K: " + prre.getPartitionKey();
+    	myStr += " Data: " + CalAmpEvent.fromJsonAsBytes( prre.getData().array() );
+    	LazyLogger.log(logPath, true, myStr);
+	}
 }

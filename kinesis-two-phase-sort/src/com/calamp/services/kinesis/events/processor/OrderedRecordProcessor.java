@@ -16,6 +16,7 @@
 package com.calamp.services.kinesis.events.processor;
 
 import java.util.List;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -26,9 +27,9 @@ import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessor;
 import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessorCheckpointer;
 import com.amazonaws.services.kinesis.clientlibrary.types.ShutdownReason;
 import com.amazonaws.services.kinesis.model.Record;
-import com.calamp.services.kinesis.events.utils.Event;
-import com.calamp.services.kinesis.events.utils.LazyLogger;
-import com.calamp.services.kinesis.events.utils.Parameters;
+import com.calamp.services.kinesis.events.utils.CalAmpEvent;
+import com.calamp.services.kinesis.events.utils.CalAmpParameters;
+import com.calamp.services.kinesis.events.utils.Utils;
 
 /**
  * Processes records retrieved from stock trades stream.
@@ -39,6 +40,9 @@ public class OrderedRecordProcessor implements IRecordProcessor {
     private static final Log LOG = LogFactory.getLog(OrderedRecordProcessor.class);
     private String kinesisShardId;
 
+    public OrderedRecordProcessor(){
+    	Utils.initLazyLog(CalAmpParameters.readLogName, "Window Sorted Stream Start");
+    }
 	/**
      * {@inheritDoc}
      */
@@ -56,23 +60,19 @@ public class OrderedRecordProcessor implements IRecordProcessor {
 		System.out.println("Process Ordered Records #" + records.size());   
 		for (Record record : records) {
 	        // Final process record
-			Event e = processRecord( record );
-	    	System.out.println("ORDERED: " + e);
+			CalAmpEvent e = processRecord( record );
+	    	LOG.info("ORDERED: " + e);
 	    }
     	checkpoint(checkpointer);
     }
 
-    private Event processRecord(Record record) {
-    	Event e = Event.fromJsonAsBytes(record.getData().array());
+    private CalAmpEvent processRecord(Record record) {
+    	CalAmpEvent e = CalAmpEvent.fromJsonAsBytes(record.getData().array());
     	if (e == null) {
     	    LOG.warn("Skipping record. Unable to parse record into StockTrade. Partition Key: " + record.getPartitionKey());
     	    return null;
     	}
-    	String myStr = "";
-    	myStr += " Seq-ID: " + record.getSequenceNumber();
-    	myStr += " Part-K: " + record.getPartitionKey();
-    	myStr += " Data: " + e;
-    	LazyLogger.log(Parameters.readLogName, true, myStr);
+    	Utils.lazyLog(record, CalAmpParameters.orderedStreamName, CalAmpParameters.readLogName);
     	return e;
     }
     /**
