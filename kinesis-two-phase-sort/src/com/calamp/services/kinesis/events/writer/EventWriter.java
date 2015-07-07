@@ -57,7 +57,7 @@ public class EventWriter {
      *
      * @param trade instance representing the stock trade
      * @param kinesisClient Amazon Kinesis client
-     * @param streamName Name of stream
+     * @param streamName Name of stream 
      */
     public static void sendEvent(CalAmpEvent trade, AmazonKinesis kinesisClient, String streamName ) {
         byte[] bytes = trade.toJsonAsBytes();
