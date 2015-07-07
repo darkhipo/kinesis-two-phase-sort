@@ -40,10 +40,10 @@ import com.amazonaws.services.kinesis.model.PutRecordsRequestEntry;
 import com.amazonaws.services.kinesis.model.PutRecordsResult;
 import com.amazonaws.services.kinesis.model.PutRecordsResultEntry;
 import com.amazonaws.services.kinesis.model.Record;
+import com.calamp.services.kinesis.events.data.CalAmpEvent;
 import com.calamp.services.kinesis.events.utils.CalAmpEventPriorityComparator;
 import com.calamp.services.kinesis.events.utils.ConfigurationUtils;
 import com.calamp.services.kinesis.events.utils.CredentialUtils;
-import com.calamp.services.kinesis.events.utils.CalAmpEvent;
 import com.calamp.services.kinesis.events.utils.CalAmpEventFilter;
 import com.calamp.services.kinesis.events.utils.CalAmpParameters;
 import com.calamp.services.kinesis.events.utils.Utils;
@@ -139,7 +139,7 @@ public class UnorderedRecordProcessor implements IRecordProcessor {
 		List<PutRecordsRequestEntry> prres = Collections.synchronizedList( new ArrayList<PutRecordsRequestEntry>() );
 		for (CalAmpEvent e : events){
 			PutRecordsRequestEntry prre = new PutRecordsRequestEntry().withData(ByteBuffer.wrap(e.toJsonAsBytes()));
-			prre.setPartitionKey( e.getTickerSymbol() );
+			prre.setPartitionKey( String.valueOf( e.getMachineId() ) );
 			prres.add(prre);
 			Utils.lazyLog(prre, streamName, CalAmpParameters.bufferLogName);
 		}

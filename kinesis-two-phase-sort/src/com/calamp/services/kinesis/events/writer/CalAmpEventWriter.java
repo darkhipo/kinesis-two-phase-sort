@@ -29,9 +29,9 @@ import com.amazonaws.services.kinesis.AmazonKinesis;
 import com.amazonaws.services.kinesis.AmazonKinesisClient;
 import com.amazonaws.services.kinesis.model.PutRecordRequest;
 import com.amazonaws.services.kinesis.model.PutRecordResult;
+import com.calamp.services.kinesis.events.data.CalAmpEvent;
 import com.calamp.services.kinesis.events.utils.ConfigurationUtils;
 import com.calamp.services.kinesis.events.utils.CredentialUtils;
-import com.calamp.services.kinesis.events.utils.CalAmpEvent;
 import com.calamp.services.kinesis.events.utils.CalAmpParameters;
 import com.calamp.services.kinesis.events.utils.Utils;
 
@@ -39,13 +39,13 @@ import com.calamp.services.kinesis.events.utils.Utils;
  * Continuously sends simulated stock trades to Kinesis
  *
  */
-public class EventWriter {
+public class CalAmpEventWriter {
 	static String prevSeqNum = null;
-    private static final Log LOG = LogFactory.getLog(EventWriter.class);
+    private static final Log LOG = LogFactory.getLog(CalAmpEventWriter.class);
 
     private static void checkUsage(String[] args) {
         if (args.length != 2) {
-            System.err.println("Usage: " + EventWriter.class.getSimpleName()
+            System.err.println("Usage: " + CalAmpEventWriter.class.getSimpleName()
                     + " <stream name> <region>");
             System.exit(1);
         }
@@ -70,7 +70,7 @@ public class EventWriter {
         LOG.info("Putting trade: " + trade.toString());
         PutRecordRequest putRecord = new PutRecordRequest();
         putRecord.setStreamName(CalAmpParameters.unorderdStreamName);
-        putRecord.setPartitionKey(trade.getTickerSymbol());
+        putRecord.setPartitionKey( String.valueOf(trade.getMachineId()) );
         putRecord.setData(ByteBuffer.wrap(bytes));
 
         //This is needed to guaranteed FIFO ordering per partitionKey
@@ -107,9 +107,9 @@ public class EventWriter {
         Utils.initLazyLog(CalAmpParameters.writeLogName, "Producer Start");
         
         // Repeatedly send stock trades with a some milliseconds wait in between
-        EventGenerator stockTradeGenerator = new EventGenerator();
+        CalAmpEventGenerator eventGenerator = new CalAmpEventGenerator();
         while( true ) {
-            CalAmpEvent trade = stockTradeGenerator.getRandomTrade();
+            CalAmpEvent trade = eventGenerator.getRandomMessage();
             sendEvent(trade, kinesisClient, streamName);
             Thread.sleep(com.calamp.services.kinesis.events.utils.CalAmpParameters.writerSleepMillis);
         }

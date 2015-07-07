@@ -27,7 +27,7 @@ import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessor;
 import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessorCheckpointer;
 import com.amazonaws.services.kinesis.clientlibrary.types.ShutdownReason;
 import com.amazonaws.services.kinesis.model.Record;
-import com.calamp.services.kinesis.events.utils.CalAmpEvent;
+import com.calamp.services.kinesis.events.data.CalAmpEvent;
 import com.calamp.services.kinesis.events.utils.CalAmpParameters;
 import com.calamp.services.kinesis.events.utils.Utils;
 
