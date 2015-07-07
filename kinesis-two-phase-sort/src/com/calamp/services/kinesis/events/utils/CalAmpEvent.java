@@ -18,8 +18,6 @@ package com.calamp.services.kinesis.events.utils;
 import java.io.IOException;
 import java.util.Random;
 
-import javax.swing.text.html.HTMLDocument.HTMLReader.IsindexAction;
-
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 

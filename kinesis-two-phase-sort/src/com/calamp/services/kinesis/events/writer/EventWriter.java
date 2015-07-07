@@ -25,17 +25,13 @@ import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.regions.Region;
 import com.amazonaws.regions.RegionUtils;
-import com.amazonaws.services.dynamodbv2.datamodeling.AttributeTransformer.Parameters;
 import com.amazonaws.services.kinesis.AmazonKinesis;
 import com.amazonaws.services.kinesis.AmazonKinesisClient;
-import com.amazonaws.services.kinesis.model.DescribeStreamResult;
 import com.amazonaws.services.kinesis.model.PutRecordRequest;
 import com.amazonaws.services.kinesis.model.PutRecordResult;
-import com.amazonaws.services.kinesis.model.ResourceNotFoundException;
 import com.calamp.services.kinesis.events.utils.ConfigurationUtils;
 import com.calamp.services.kinesis.events.utils.CredentialUtils;
 import com.calamp.services.kinesis.events.utils.CalAmpEvent;
-import com.calamp.services.kinesis.events.utils.LazyLogger;
 import com.calamp.services.kinesis.events.utils.CalAmpParameters;
 import com.calamp.services.kinesis.events.utils.Utils;
 

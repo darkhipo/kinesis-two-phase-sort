@@ -34,9 +34,7 @@ import com.amazonaws.services.kinesis.clientlibrary.lib.worker.KinesisClientLibC
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.Worker;
 import com.calamp.services.kinesis.events.utils.ConfigurationUtils;
 import com.calamp.services.kinesis.events.utils.CredentialUtils;
-import com.calamp.services.kinesis.events.utils.LazyLogger;
 import com.calamp.services.kinesis.events.utils.CalAmpParameters;
-import com.calamp.services.kinesis.events.utils.Utils;
 
 /**
  * Uses the Kinesis Client Library (KCL) to continuously consume and process stock trade
