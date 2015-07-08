@@ -100,7 +100,7 @@ public class CalAmpEventProcessor {
             .withCommonClientConfig(cc)
             .withMaxRecords(com.calamp.services.kinesis.events.utils.CalAmpParameters.maxRecPerPoll)
             .withIdleTimeBetweenReadsInMillis(com.calamp.services.kinesis.events.utils.CalAmpParameters.pollDelayMillis)
-            .withCallProcessRecordsEvenForEmptyRecordList(true)
+            .withCallProcessRecordsEvenForEmptyRecordList(CalAmpParameters.alwaysPoll)
             .withInitialPositionInStream(InitialPositionInStream.TRIM_HORIZON); 
 
         IRecordProcessorFactory processorFactory = new RecordProcessorFactory( isUnordered );

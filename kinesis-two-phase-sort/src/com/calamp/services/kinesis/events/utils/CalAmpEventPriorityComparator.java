@@ -11,7 +11,7 @@ public class CalAmpEventPriorityComparator implements Comparator<com.calamp.serv
 	public int compare(com.calamp.services.kinesis.events.data.CalAmpEvent e1, com.calamp.services.kinesis.events.data.CalAmpEvent e2){
 		int c1 = (int) ( e1.getTimeStamp() - e2.getTimeStamp() );		//Sort by time-stamp 
 		int c2 = (int) ( e1.getSequenceNumber() - e2.getSequenceNumber() );			//then by sequence number
-		int c3 = (int) ( (e1.isAck() ? 1 : 0) - (e2.isAck() ? 1 : 0) );		//then by boolean "is message_type==1" (true has precedence)
+		int c3 = (int) ( (e1.getIsAnAck() ? 1 : 0) - (e2.getIsAnAck() ? 1 : 0) );		//then by boolean "is message_type==1" (true has precedence)
 		int c4 = (int) ( e1.getMachineId() - e2.getMachineId() );	//then by machine identifier.
 		
 		if( c1 != 0 ){

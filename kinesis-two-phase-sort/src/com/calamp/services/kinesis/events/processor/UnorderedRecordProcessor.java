@@ -15,7 +15,6 @@
 
 package com.calamp.services.kinesis.events.processor;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -35,10 +34,6 @@ import com.amazonaws.services.kinesis.clientlibrary.exceptions.ThrottlingExcepti
 import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessor;
 import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessorCheckpointer;
 import com.amazonaws.services.kinesis.clientlibrary.types.ShutdownReason;
-import com.amazonaws.services.kinesis.model.PutRecordsRequest;
-import com.amazonaws.services.kinesis.model.PutRecordsRequestEntry;
-import com.amazonaws.services.kinesis.model.PutRecordsResult;
-import com.amazonaws.services.kinesis.model.PutRecordsResultEntry;
 import com.amazonaws.services.kinesis.model.Record;
 import com.calamp.services.kinesis.events.data.CalAmpEvent;
 import com.calamp.services.kinesis.events.utils.CalAmpEventPriorityComparator;
@@ -130,47 +125,11 @@ public class UnorderedRecordProcessor implements IRecordProcessor {
 			LOG.info("Event old enough: " + cae);
 		}
 		
-		putByParts( eventsTooYoung, CalAmpParameters.unorderdStreamName, kinesisClientToUnordered);
-		putByParts( eventsOldEnough, CalAmpParameters.orderedStreamName, kinesisClientToOrdered);
+		Utils.putByParts( eventsTooYoung, CalAmpParameters.unorderdStreamName, kinesisClientToUnordered, CalAmpParameters.bufferLogName);
+		Utils.putByParts( eventsOldEnough, CalAmpParameters.orderedStreamName, kinesisClientToOrdered, CalAmpParameters.bufferLogName);
 		checkpoint(checkpointer);  
     }
 
-	private void putByParts(List<CalAmpEvent> events, String streamName, AmazonKinesis kc) {
-		List<PutRecordsRequestEntry> prres = Collections.synchronizedList( new ArrayList<PutRecordsRequestEntry>() );
-		for (CalAmpEvent e : events){
-			PutRecordsRequestEntry prre = new PutRecordsRequestEntry().withData(ByteBuffer.wrap(e.toJsonAsBytes()));
-			prre.setPartitionKey( String.valueOf( e.getMachineId() ) );
-			prres.add(prre);
-			Utils.lazyLog(prre, streamName, CalAmpParameters.bufferLogName);
-		}
-		if (prres.size() > 0){
-			int requestNumber = ( events.size() / CalAmpParameters.maxRecordsPerPut );
-			requestNumber += (events.size() % CalAmpParameters.maxRecordsPerPut) == 0 ? 0 : 1;
-			for (int j=0; j<requestNumber; j++){
-				PutRecordsRequest putRecords = new PutRecordsRequest( ).withRecords(prres);
-				putRecords.setStreamName(streamName);
-				PutRecordsResult prr = kc.putRecords(putRecords);
-				
-				/* Retry failed "record puts" until success.
-				 */
-				while (prr.getFailedRecordCount() > 0) {
-				    final List<PutRecordsRequestEntry> failedRecordsList = new ArrayList<>();
-				    final List<PutRecordsResultEntry> putRecordsResultEntryList = prr.getRecords();
-				    for (int i = 0; i < putRecordsResultEntryList.size(); i++) {
-				        final PutRecordsRequestEntry putRecordRequestEntry = prres.get(i);
-				        final PutRecordsResultEntry putRecordsResultEntry = putRecordsResultEntryList.get(i);
-				        if (putRecordsResultEntry.getErrorCode() != null) {
-				            failedRecordsList.add(putRecordRequestEntry);
-				        }
-				    }
-				    prres = failedRecordsList;
-				    putRecords.setRecords(prres);
-				    prr = kc.putRecords(putRecords);
-				}
-			}
-		}
-	}
-	
     /**
      * {@inheritDoc}
      */

@@ -26,7 +26,7 @@ import com.calamp.services.kinesis.events.data.CalAmpEvent;
 
 public class CalAmpEventGenerator {
     
-    public CalAmpEvent getRandomMessage() {
+    public static CalAmpEvent getRandomMessage() {
     	String r1 = UUID.randomUUID().toString();
     	String r2 = UUID.randomUUID().toString();
     	String r3 = UUID.randomUUID().toString();

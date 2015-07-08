@@ -6,11 +6,19 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
 
 import com.amazonaws.services.kinesis.AmazonKinesis;
 import com.amazonaws.services.kinesis.model.DescribeStreamResult;
 import com.amazonaws.services.kinesis.model.PutRecordRequest;
+import com.amazonaws.services.kinesis.model.PutRecordsRequest;
 import com.amazonaws.services.kinesis.model.PutRecordsRequestEntry;
+import com.amazonaws.services.kinesis.model.PutRecordsResult;
+import com.amazonaws.services.kinesis.model.PutRecordsResultEntry;
 import com.amazonaws.services.kinesis.model.Record;
 import com.amazonaws.services.kinesis.model.ResourceNotFoundException;
 import com.calamp.services.kinesis.events.data.CalAmpEvent;
@@ -35,6 +43,7 @@ public class Utils {
 		}
 		return null;
 	}
+	
 	public static void writeLastSeqNum(String last){
 		File f = new File(pathToLastSeq);
 		try {
@@ -70,6 +79,49 @@ public class Utils {
             System.exit(1);
         }
     }
+    
+    public static void putByParts(List<CalAmpEvent> events, String streamName, AmazonKinesis kc, String logPath) {
+		List<PutRecordsRequestEntry> prres = Collections.synchronizedList( new ArrayList<PutRecordsRequestEntry>() );
+		for (CalAmpEvent e : events){
+			PutRecordsRequestEntry prre = new PutRecordsRequestEntry().withData(ByteBuffer.wrap(e.toJsonAsBytes()));
+			prre.setPartitionKey( String.valueOf( e.getMachineId() ) );
+			prres.add(prre);
+			Utils.lazyLog(prre, streamName, logPath);
+			
+		}
+		
+		if (prres.size() > 0){
+			int requestNumber = ( events.size() / CalAmpParameters.maxRecordsPerPut );
+			requestNumber += (events.size() % CalAmpParameters.maxRecordsPerPut) == 0 ? 0 : 1;
+			Iterator<PutRecordsRequestEntry> it = prres.iterator();
+			for (int j=0; j<requestNumber; j++){
+				List<PutRecordsRequestEntry> payLoad = new ArrayList<PutRecordsRequestEntry>();
+				while( it.hasNext() && payLoad.size() < CalAmpParameters.maxRecordsPerPut ){
+					payLoad.add(it.next());
+				}
+				PutRecordsRequest putRecords = new PutRecordsRequest( ).withRecords(payLoad);
+				putRecords.setStreamName(streamName);
+				PutRecordsResult prr = kc.putRecords(putRecords);
+				
+				/* Retry failed "record puts" until success.
+				 */
+				while (prr.getFailedRecordCount() > 0) {
+				    final List<PutRecordsRequestEntry> failedRecordsList = new ArrayList<>();
+				    final List<PutRecordsResultEntry> putRecordsResultEntryList = prr.getRecords();
+				    for (int i = 0; i < putRecordsResultEntryList.size(); i++) {
+				        final PutRecordsRequestEntry putRecordRequestEntry = payLoad.get(i);
+				        final PutRecordsResultEntry putRecordsResultEntry = putRecordsResultEntryList.get(i);
+				        if (putRecordsResultEntry.getErrorCode() != null) {
+				            failedRecordsList.add(putRecordRequestEntry);
+				        }
+				    }
+				    prres = failedRecordsList;
+				    putRecords.setRecords(prres);
+				    prr = kc.putRecords(putRecords);
+				}
+			}
+		}
+	}
     
     public static void lazyLog(PutRecordRequest putRecord, String logPath) {
     	String myStr = "PUT TO [" + putRecord.getStreamName() + "] ";
