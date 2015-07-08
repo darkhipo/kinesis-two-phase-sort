@@ -29,9 +29,10 @@ public class LazyLogger {
 	}
 	
 	public static String ts(){
-		Date currentTime = new Date();
-		SimpleDateFormat sdf = new SimpleDateFormat("ss:mm:hh:d:MM:yyyy");
-		sdf.setTimeZone(TimeZone.getTimeZone("UTC")); //GMT UTC
-		return( sdf.format(currentTime) );
+		//Date currentTime = new Date();
+		//SimpleDateFormat sdf = new SimpleDateFormat("SSS:ss:mm:hh:d:MM:yyyy");
+		//sdf.setTimeZone(TimeZone.getTimeZone("UTC")); //GMT UTC
+		//return( sdf.format(currentTime) );
+		return Long.toString( System.currentTimeMillis() );
 	}
 }

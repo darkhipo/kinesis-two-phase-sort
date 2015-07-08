@@ -87,7 +87,6 @@ public class Utils {
 			prre.setPartitionKey( String.valueOf( e.getMachineId() ) );
 			prres.add(prre);
 			Utils.lazyLog(prre, streamName, logPath);
-			
 		}
 		
 		if (prres.size() > 0){
@@ -103,7 +102,8 @@ public class Utils {
 				putRecords.setStreamName(streamName);
 				PutRecordsResult prr = kc.putRecords(putRecords);
 				
-				/* Retry failed "record puts" until success.
+				/** 
+				 * Retry failed "record puts" until success.
 				 */
 				while (prr.getFailedRecordCount() > 0) {
 				    final List<PutRecordsRequestEntry> failedRecordsList = new ArrayList<>();

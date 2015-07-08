@@ -174,12 +174,13 @@ public class CalAmpEventWriter {
 
         // Validate that the stream exists and is active
         Utils.validateStream(kinesisClient, streamName);
-        Utils.initLazyLog(CalAmpParameters.writeLogName, "Producer Start");
+
         
         //int numToGen = 510; 
         String filePath = "/home/darkhipov/Desktop/kinesis-test-events.in";
         //genRandEventsToFile( filePath, numToGen );
         List<CalAmpEvent> buffer = readEventsFromFile(filePath);
+        Utils.initLazyLog( CalAmpParameters.writeLogName, "Producer Send Start" );
         Utils.putByParts(buffer, CalAmpParameters.unorderdStreamName, kinesisClient, CalAmpParameters.writeLogName);
         System.out.println("Writer Done");
         //runningLoop(new RandomEventSender(kinesisClient, filePath, CalAmpParameters.pollDelayMillis));
