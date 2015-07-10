@@ -27,7 +27,8 @@ import com.calamp.services.kinesis.events.data.CalAmpEvent;
 
 public class Utils {
 
-	static final String pathToLastSeq = "lastSeq.bak";
+	private static final String pathToLastSeq = "lastSeq.bak";
+    private static String prevSeqNum = null;
 	
 	public static String getLastSeqNum( ){
 		File f = new File(pathToLastSeq);
@@ -44,7 +45,6 @@ public class Utils {
 		}
 		return null;
 	}
-	
 	public static void writeLastSeqNum(String last){
 		File f = new File(pathToLastSeq);
 		try {
@@ -56,7 +56,6 @@ public class Utils {
 			e.printStackTrace();
 		}
 	}
-	
     /**
      * Checks if the stream exists and is active
      *
@@ -80,7 +79,6 @@ public class Utils {
             System.exit(1);
         }
     }
-    
     public static void putByParts(List<CalAmpEvent> events, String streamName, AmazonKinesis kc, String logPath) {
 		List<PutRecordsRequestEntry> prres = Collections.synchronizedList( new ArrayList<PutRecordsRequestEntry>() );
 		for (CalAmpEvent e : events){
@@ -126,29 +124,37 @@ public class Utils {
 			}
 		}
 	}
-    
-    private static String prevSeqNum = null;
     public static void putObo(List<CalAmpEvent> events, String streamName, AmazonKinesis kc, String logPath) {
 		for (CalAmpEvent e : events){
 			PutRecordRequest prreq = new PutRecordRequest();
 			prreq.setData( ByteBuffer.wrap( e.toJsonAsBytes() ) );
 			prreq.setStreamName( streamName );
 			prreq.setPartitionKey( String.valueOf( e.getMachineId() ) );
+			Utils.lazyLog(prreq, streamName, logPath, "");
 	        //This is needed to guaranteed FIFO ordering per partitionKey
 	        if (prevSeqNum != null){
 	        	 prreq.setSequenceNumberForOrdering( prevSeqNum );
 	        }
 	        try {
+	        	lazyLog(prreq, streamName, CalAmpParameters.putLogName, "Start");
 	        	PutRecordResult prres = kc.putRecord(prreq);
 	        	prevSeqNum = prres.getSequenceNumber();
 	        	Utils.lazyLog(prres, streamName, logPath);
+	        	lazyLog(prreq, streamName, CalAmpParameters.putLogName, "Stop");
 	        } catch (AmazonClientException ex) {
 	        	ex.printStackTrace();
-	            //Log.warn("Error sending record to Amazon Kinesis.", ex);
 	        }
 		}
 	}
-    private static void lazyLog(PutRecordResult prre, String streamName, String logPath) {
+    private static void lazyLog(PutRecordRequest prreq, String streamName, String logname, String message) {
+    	String myStr = "PUT TO [" + streamName + "] ";
+    	myStr += " Bytes: " + prreq.getData().array().length;
+    	myStr += " Seq-ID: " + prreq.getSequenceNumberForOrdering();
+    	myStr += " Part-K: " + prreq.getPartitionKey();
+    	myStr += message;
+    	LazyLogger.log(logname, true, myStr);
+	}
+	private static void lazyLog(PutRecordResult prre, String streamName, String logPath) {
     	String myStr = "PUT TO [" + streamName + "] ";
     	myStr += " Seq-ID: " + prre.getSequenceNumber();
     	myStr += " Shard-K: " + prre.getShardId();
