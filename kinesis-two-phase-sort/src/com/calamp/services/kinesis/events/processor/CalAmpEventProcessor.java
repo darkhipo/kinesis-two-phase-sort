@@ -91,7 +91,7 @@ public class CalAmpEventProcessor {
         AmazonKinesis kinesisClient = new AmazonKinesisClient(credentialsProvider, cc);
         kinesisClient.setRegion(region);
         
-        com.calamp.services.kinesis.events.utils.Utils.kinesisClient = kinesisClient;
+        //Utils.kinesisClient = kinesisClient;
         
         String workerId = String.valueOf(UUID.randomUUID());
         KinesisClientLibConfiguration kclConfig =

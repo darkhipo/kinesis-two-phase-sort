@@ -181,7 +181,8 @@ public class CalAmpEventWriter {
         //genRandEventsToFile( filePath, numToGen );
         List<CalAmpEvent> buffer = readEventsFromFile(filePath);
         Utils.initLazyLog( CalAmpParameters.writeLogName, "Producer Send Start" );
-        Utils.putByParts(buffer, CalAmpParameters.unorderdStreamName, kinesisClient, CalAmpParameters.writeLogName);
+        //Utils.putByParts(buffer, CalAmpParameters.unorderdStreamName, kinesisClient, CalAmpParameters.writeLogName);
+        Utils.putObo(buffer, CalAmpParameters.unorderdStreamName, kinesisClient, CalAmpParameters.writeLogName);
         System.out.println("Writer Done");
         //runningLoop(new RandomEventSender(kinesisClient, filePath, CalAmpParameters.pollDelayMillis));
     }

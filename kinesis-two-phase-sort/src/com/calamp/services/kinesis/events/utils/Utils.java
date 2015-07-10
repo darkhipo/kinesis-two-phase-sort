@@ -12,9 +12,11 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
+import com.amazonaws.AmazonClientException;
 import com.amazonaws.services.kinesis.AmazonKinesis;
 import com.amazonaws.services.kinesis.model.DescribeStreamResult;
 import com.amazonaws.services.kinesis.model.PutRecordRequest;
+import com.amazonaws.services.kinesis.model.PutRecordResult;
 import com.amazonaws.services.kinesis.model.PutRecordsRequest;
 import com.amazonaws.services.kinesis.model.PutRecordsRequestEntry;
 import com.amazonaws.services.kinesis.model.PutRecordsResult;
@@ -25,7 +27,6 @@ import com.calamp.services.kinesis.events.data.CalAmpEvent;
 
 public class Utils {
 
-	public static AmazonKinesis kinesisClient;
 	static final String pathToLastSeq = "lastSeq.bak";
 	
 	public static String getLastSeqNum( ){
@@ -94,12 +95,14 @@ public class Utils {
 			requestNumber += (events.size() % CalAmpParameters.maxRecordsPerPut) == 0 ? 0 : 1;
 			Iterator<PutRecordsRequestEntry> it = prres.iterator();
 			for (int j=0; j<requestNumber; j++){
+				
 				List<PutRecordsRequestEntry> payLoad = new ArrayList<PutRecordsRequestEntry>();
 				while( it.hasNext() && payLoad.size() < CalAmpParameters.maxRecordsPerPut ){
 					payLoad.add(it.next());
 				}
 				PutRecordsRequest putRecords = new PutRecordsRequest( ).withRecords(payLoad);
 				putRecords.setStreamName(streamName);
+				Utils.lazyLog(payLoad, streamName, CalAmpParameters.putLogName, "Start");
 				PutRecordsResult prr = kc.putRecords(putRecords);
 				
 				/** 
@@ -119,15 +122,45 @@ public class Utils {
 				    putRecords.setRecords(prres);
 				    prr = kc.putRecords(putRecords);
 				}
+				lazyLog(payLoad, streamName, CalAmpParameters.putLogName, "Stop");
 			}
 		}
 	}
     
-    public static void lazyLog(PutRecordRequest putRecord, String logPath) {
-    	String myStr = "PUT TO [" + putRecord.getStreamName() + "] ";
-    	myStr += " Seq-ID: " + putRecord.getSequenceNumberForOrdering();
-    	myStr += " Part-K: " + putRecord.getPartitionKey();
-    	myStr += " Data: " + CalAmpEvent.fromJsonAsBytes( putRecord.getData().array() );
+    private static String prevSeqNum = null;
+    public static void putObo(List<CalAmpEvent> events, String streamName, AmazonKinesis kc, String logPath) {
+		for (CalAmpEvent e : events){
+			PutRecordRequest prreq = new PutRecordRequest();
+			prreq.setData( ByteBuffer.wrap( e.toJsonAsBytes() ) );
+			prreq.setStreamName( streamName );
+			prreq.setPartitionKey( String.valueOf( e.getMachineId() ) );
+	        //This is needed to guaranteed FIFO ordering per partitionKey
+	        if (prevSeqNum != null){
+	        	 prreq.setSequenceNumberForOrdering( prevSeqNum );
+	        }
+	        try {
+	        	PutRecordResult prres = kc.putRecord(prreq);
+	        	prevSeqNum = prres.getSequenceNumber();
+	        	Utils.lazyLog(prres, streamName, logPath);
+	        } catch (AmazonClientException ex) {
+	        	ex.printStackTrace();
+	            //Log.warn("Error sending record to Amazon Kinesis.", ex);
+	        }
+		}
+	}
+    private static void lazyLog(PutRecordResult prre, String streamName, String logPath) {
+    	String myStr = "PUT TO [" + streamName + "] ";
+    	myStr += " Seq-ID: " + prre.getSequenceNumber();
+    	myStr += " Shard-K: " + prre.getShardId();
+    	LazyLogger.log(logPath, true, myStr);
+	}
+	public static void lazyLog(List<PutRecordsRequestEntry> payLoad, String stream, String logPath, String message) {
+    	int acc = 0;
+    	for (PutRecordsRequestEntry e: payLoad){
+    		acc += e.getData().array().length;
+    	}
+    	String myStr;
+		myStr = "PUT (" + payLoad.size() + "," + acc  + ") TO [" + stream + "] " + message;
     	LazyLogger.log(logPath, true, myStr);
     }
     public static void lazyLog(Record record, String stream, String logPath) {
@@ -146,4 +179,11 @@ public class Utils {
     	myStr += " Data: " + CalAmpEvent.fromJsonAsBytes( prre.getData().array() );
     	LazyLogger.log(logPath, true, myStr);
 	}
+	public static void lazyLog(PutRecordRequest putRecord, String logPath) {
+    	String myStr = "PUT TO [" + putRecord.getStreamName() + "] ";
+    	myStr += " Seq-ID: " + putRecord.getSequenceNumberForOrdering();
+    	myStr += " Part-K: " + putRecord.getPartitionKey();
+    	myStr += " Data: " + CalAmpEvent.fromJsonAsBytes( putRecord.getData().array() );
+    	LazyLogger.log(logPath, true, myStr);
+    }
 }
