@@ -60,7 +60,7 @@ public class CalAmpEventWriter {
 
 
     /**
-     * Uses the Kinesis client to send the stock trade to the given stream.
+     * Uses the Kinesis client to send the event to the given stream.
      *
      * @param trade instance representing the stock trade
      * @param kinesisClient Amazon Kinesis client
@@ -121,7 +121,7 @@ public class CalAmpEventWriter {
             CalAmpEvent event = CalAmpEventGenerator.getRandomMessage();
 			bw.write( event.toJsonAsString() );
 			bw.newLine();
-            System.out.println( event.toJsonAsString() );
+            //System.out.println( event.toJsonAsString() );
             //System.out.println( CalAmpEvent.fromJsonAsString(event.toJsonAsString()) );
         }
 		if (bw != null){
@@ -176,16 +176,18 @@ public class CalAmpEventWriter {
         Utils.validateStream(kinesisClient, streamName);
 
         
-        //int numToGen = 510; 
-        String filePath = "/home/darkhipov/Desktop/kinesis-test-events.in";
+        int numToGen = 50000; 
+        String filePath = "kinesis-rand-events.in";
+        
         //genRandEventsToFile( filePath, numToGen );
         List<CalAmpEvent> buffer = readEventsFromFile(filePath);
         Utils.initLazyLog( CalAmpParameters.writeLogName, "Producer Send Start" );
-        //Utils.putByParts(buffer, CalAmpParameters.unorderdStreamName, kinesisClient, CalAmpParameters.writeLogName);
-        Utils.putObo(buffer, CalAmpParameters.unorderdStreamName, kinesisClient, CalAmpParameters.writeLogName);
-        System.out.println("Writer Done");
+       
+        Utils.putByParts(buffer, CalAmpParameters.unorderdStreamName, kinesisClient, CalAmpParameters.writeLogName);
+        //Utils.putObo(buffer, CalAmpParameters.unorderdStreamName, kinesisClient, CalAmpParameters.writeLogName);
+        
         //runningLoop(new RandomEventSender(kinesisClient, filePath, CalAmpParameters.pollDelayMillis));
+        System.out.println("Writer Done");
     }
-
 }
 

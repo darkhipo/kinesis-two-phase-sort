@@ -3,6 +3,7 @@ package com.calamp.services.kinesis.events.data;
 
 import java.io.IOException;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.Random;
 
 import org.apache.commons.codec.binary.Base64;
@@ -102,7 +103,7 @@ public class CalAmpEvent /*extends MessageContent*/{
         }
     }
 
-    private boolean canEqual(Object other){
+    public boolean canEqual(Object other){
     	return (other instanceof CalAmpEvent);
     }
     
@@ -116,16 +117,21 @@ public class CalAmpEvent /*extends MessageContent*/{
     public boolean equals(Object other){
     	if ( this.canEqual(other) ){
     		CalAmpEvent e2 = (CalAmpEvent) other;
-    		boolean mayEqual = true;
-    		mayEqual &= ( this.timeStamp == e2.getTimeStamp() );
-    		mayEqual &= ( this.sequenceNumber == e2.getSequenceNumber() );
-    		
-    		mayEqual &= ( this.isAnAck == e2.getIsAnAck() ); 
-    		mayEqual &= (this.ipUdpHeader == null && e2.ipUdpHeader == null) ? true : ( this.ipUdpHeader.equals(e2.getIpUdpHeader()) );
-    		mayEqual &= (this.optionsHeader == null && e2.optionsHeader == null) ? true : ( this.optionsHeader.equals(e2.getOptionsHeader())   );
-    		mayEqual &= (this.messageHeader == null && e2.messageHeader == null) ? true : ( this.messageHeader.equals(e2.getMessageHeader()) );
-    		mayEqual &= (this.messageContent == null && e2.messageContent == null) ? true : ( this.messageContent.equals(e2.getMessageContent()) );
-    		return mayEqual;
+    		if (e2.canEqual(this)){
+    			boolean mayEqual = true;
+    			mayEqual &= (this.timeStamp == e2.getTimeStamp() );
+	    		mayEqual &= (this.sequenceNumber == e2.getSequenceNumber() );
+	    		mayEqual &= (this.isAnAck == e2.getIsAnAck() ); 
+	    		mayEqual &= (this.machineId == e2.getMachineId() );
+	    		
+	    		mayEqual &= (this.ipUdpHeader == null && e2.ipUdpHeader == null) ? true : this.ipUdpHeader != null && e2.getIpUdpHeader() != null && ( this.ipUdpHeader.equals(e2.getIpUdpHeader()) );
+	    		mayEqual &= (this.optionsHeader == null && e2.optionsHeader == null) ? true : this.optionsHeader != null && e2.getOptionsHeader() != null && ( this.optionsHeader.equals(e2.getOptionsHeader())   );
+	    		mayEqual &= (this.messageHeader == null && e2.messageHeader == null) ? true : this.messageHeader == null && e2.getMessageHeader() != null && ( this.messageHeader.equals(e2.getMessageHeader()) );
+	    		mayEqual &= (this.messageContent == null && e2.messageContent == null) ? true : this.messageContent != null && e2.getMessageContent() != null && ( this.messageContent.equals(e2.getMessageContent()) );
+	    		mayEqual &= Arrays.equals(this.dataBytes, e2.getDataBytes());
+	    		
+	    		return mayEqual;
+    		}
     	}
     	return false;
     }
@@ -133,7 +139,7 @@ public class CalAmpEvent /*extends MessageContent*/{
     @Override 
     public int hashCode() {
         int result = 0; 
-        result += 41 * ( this.timeStamp ^ (this.timeStamp >>> 32));
+        result += 41 * ( this.timeStamp ^ (this.timeStamp >>> 32) );
     	result += 41 * this.sequenceNumber;
     	result += 41 * (this.isAnAck ? 1 : 0);
         result += 41 * this.machineId;
@@ -142,6 +148,10 @@ public class CalAmpEvent /*extends MessageContent*/{
         result += 41 * ( (this.optionsHeader == null) ? 0 : this.optionsHeader.hashCode() );
         result += 41 * ( (this.messageHeader == null) ? 0 : this.messageHeader.hashCode() );
         result += 41 * ( (this.messageContent == null) ? 0 : this.messageContent.hashCode() );
+        
+        for (Byte b : this.dataBytes){
+        	result += 41 * (int) b;
+        }
         return result;
     }
 
